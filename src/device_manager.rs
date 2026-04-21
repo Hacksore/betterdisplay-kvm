@@ -5,6 +5,36 @@ use nusb::hotplug::HotplugEvent;
 use nusb::{DeviceId, DeviceInfo, MaybeFuture};
 use std::collections::HashMap;
 
+/// All connected USB devices, sorted by vendor id, product id, then serial.
+pub fn list_usb_devices() -> anyhow::Result<Vec<DeviceInfo>> {
+  let mut device_list: Vec<DeviceInfo> = nusb::list_devices().wait()?.collect();
+  device_list.sort_by(|a, b| {
+    (
+      a.vendor_id(),
+      a.product_id(),
+      a.serial_number().unwrap_or(""),
+    )
+      .cmp(&(
+        b.vendor_id(),
+        b.product_id(),
+        b.serial_number().unwrap_or(""),
+      ))
+  });
+  Ok(device_list)
+}
+
+/// One line per device: `usb_device_id`, manufacturer, product, serial (tab-separated).
+pub fn format_usb_device_line(info: &DeviceInfo) -> String {
+  format!(
+    "{:04x}:{:04x}\t{}\t{}\t{}",
+    info.vendor_id(),
+    info.product_id(),
+    info.manufacturer_string().unwrap_or(""),
+    info.product_string().unwrap_or(""),
+    info.serial_number().unwrap_or(""),
+  )
+}
+
 pub struct DeviceManager {
   devices: HashMap<DeviceId, (u16, u16)>,
   config: ResolvedConfig,
@@ -22,9 +52,7 @@ impl DeviceManager {
   pub fn enumerate_devices(&mut self) -> anyhow::Result<()> {
     debug!("Enumerating all USB devices");
 
-    let device_list: Vec<DeviceInfo> = nusb::list_devices().wait()?.collect();
-
-    for info in device_list {
+    for info in list_usb_devices()? {
       let id = info.id();
       let vendor = info.vendor_id();
       let product = info.product_id();

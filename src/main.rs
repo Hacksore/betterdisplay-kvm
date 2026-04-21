@@ -3,6 +3,7 @@ mod device_manager;
 mod utils;
 
 use clap::{CommandFactory, Parser};
+use device_manager::{format_usb_device_line, list_usb_devices};
 use log::error;
 use utils::handle_launch_agent;
 
@@ -17,7 +18,8 @@ A daemon that monitors USB device connections and automatically switches
 BetterDisplay input sources based on configured USB device events.
 
 This tool requires the --launch flag to run as a long-lived daemon that
-monitors USB devices. Use --install to set up the launch agent.")]
+monitors USB devices. Use --install to set up the launch agent. Use --list
+to print connected USB devices.")]
 struct Cli {
   /// Install the launch agent for automatic startup
   #[arg(
@@ -25,6 +27,14 @@ struct Cli {
     help = "Install the macOS launch agent to automatically start the daemon"
   )]
   install: bool,
+
+  /// Print each connected USB device (usb id, manufacturer, product, serial)
+  #[arg(
+    long,
+    conflicts_with_all = ["install", "launch"],
+    help = "List connected USB devices to stdout and exit"
+  )]
+  list: bool,
 
   /// Run as a long-lived daemon (required for normal operation)
   #[arg(
@@ -40,6 +50,13 @@ fn main() -> anyhow::Result<()> {
   // Handle install flag
   if cli.install {
     handle_launch_agent()?;
+    return Ok(());
+  }
+
+  if cli.list {
+    for info in list_usb_devices()? {
+      println!("{}", format_usb_device_line(&info));
+    }
     return Ok(());
   }
 
