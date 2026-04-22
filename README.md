@@ -39,6 +39,27 @@ log_level = "debug"
 ddc_alt = false
 ```
 
+## Finding `usb_device_id`
+
+Run the binary with `--list`. It prints one line per connected USB device to stdout, tab-separated:
+
+1. **`usb_device_id`** — vendor and product in lowercase hex (`vvvv:pppp`), same format as in `config.toml`
+2. Manufacturer
+3. Product name
+4. Serial number (empty if the device does not expose one)
+
+```bash
+betterdisplay-kvm --list
+```
+
+Example line:
+
+```text
+046d:c54d	Logitech	USB Receiver	3480336C3135
+```
+
+Copy the first field into `usb_device_id`. The daemon matches on vendor and product only, not the serial; the serial column is there so you can tell devices apart when several share the same id.
+
 ## Development
 
 ```bash
