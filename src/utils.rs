@@ -5,10 +5,11 @@ use serde::{Deserialize, Serialize};
 use std::{
   fs,
   path::{Path, PathBuf},
-  process::{self, Command},
+  process::{self, Command, Output},
 };
 
 pub const DEFAULT_DEVICE_ID: &str = "046d:c547";
+pub const LAUNCH_AGENT_LABEL: &str = "com.github.hacksore.betterdisplay-kvm";
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AppConfig {
@@ -160,7 +161,7 @@ pub fn load_config() -> anyhow::Result<ResolvedConfig> {
 
 pub fn handle_launch_agent() -> anyhow::Result<()> {
   info!("Installing launch agent since --install was passed...");
-  let mut agent = LaunchAgent::new("com.github.hacksore.betterdisplay-kvm");
+  let mut agent = LaunchAgent::new(LAUNCH_AGENT_LABEL);
 
   // NOTE: the install.sh should move/link the bin here
   agent.program_arguments = vec![
@@ -176,6 +177,83 @@ pub fn handle_launch_agent() -> anyhow::Result<()> {
   info!("Launch agent installed and started.");
 
   process::exit(0);
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum LaunchAgentStatus {
+  Running { pid: Option<String> },
+  LoadedNotRunning,
+  NotLoaded,
+}
+
+pub fn get_launch_agent_status() -> anyhow::Result<LaunchAgentStatus> {
+  let user_id = get_current_user_id()?;
+  let target = format!("gui/{}/{}", user_id, LAUNCH_AGENT_LABEL);
+  let output = Command::new("launchctl")
+    .args(["print", &target])
+    .output()?;
+
+  Ok(parse_launch_agent_status(&output))
+}
+
+pub fn print_launch_agent_status() -> anyhow::Result<()> {
+  match get_launch_agent_status()? {
+    LaunchAgentStatus::Running { pid } => {
+      if let Some(pid) = pid {
+        println!("{} is running (pid {}).", LAUNCH_AGENT_LABEL, pid);
+      } else {
+        println!("{} is running.", LAUNCH_AGENT_LABEL);
+      }
+    }
+    LaunchAgentStatus::LoadedNotRunning => {
+      println!(
+        "{} is loaded, but the process is not running.",
+        LAUNCH_AGENT_LABEL
+      );
+    }
+    LaunchAgentStatus::NotLoaded => {
+      println!("{} is not loaded or not running.", LAUNCH_AGENT_LABEL);
+    }
+  }
+
+  Ok(())
+}
+
+fn get_current_user_id() -> anyhow::Result<String> {
+  let output = Command::new("id").arg("-u").output()?;
+  if !output.status.success() {
+    return Err(anyhow::anyhow!(
+      "Failed to determine current user id: {}",
+      String::from_utf8_lossy(&output.stderr).trim()
+    ));
+  }
+
+  Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+}
+
+fn parse_launch_agent_status(output: &Output) -> LaunchAgentStatus {
+  if !output.status.success() {
+    return LaunchAgentStatus::NotLoaded;
+  }
+
+  let stdout = String::from_utf8_lossy(&output.stdout);
+  if stdout.contains("state = running") || stdout.contains("job state = running") {
+    return LaunchAgentStatus::Running {
+      pid: extract_launchctl_value(&stdout, "pid = "),
+    };
+  }
+
+  LaunchAgentStatus::LoadedNotRunning
+}
+
+fn extract_launchctl_value(output: &str, prefix: &str) -> Option<String> {
+  output
+    .lines()
+    .map(str::trim)
+    .find_map(|line| line.strip_prefix(prefix))
+    .map(str::trim)
+    .filter(|value| !value.is_empty())
+    .map(ToString::to_string)
 }
 
 pub fn setup_logger(cfg: &ResolvedConfig) -> anyhow::Result<()> {

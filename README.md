@@ -70,7 +70,34 @@ RUST_LOG=debug cargo watch -x "run -- --launch"
 
 Run `./install.sh`, and it will install a LaunchAgent and start the program.
 
+## LaunchAgent status
+
+Check whether the LaunchAgent process is running:
+
+```bash
+betterdisplay-kvm --status
+```
+
+The LaunchAgent label is `com.github.hacksore.betterdisplay-kvm`.
+
+View recent daemon logs:
+
+```bash
+ls -t ~/Library/Logs/betterdisplay-kvm/betterdisplay-kvm*.log | head -1 | xargs tail -f
+```
+
+Restart the agent after changing config:
+
+```bash
+launchctl kickstart -k "gui/$(id -u)/com.github.hacksore.betterdisplay-kvm"
+```
+
+The generated plist lives at:
+
+```text
+~/Library/LaunchAgents/com.github.hacksore.betterdisplay-kvm.plist
+```
+
 ## Uninstall
 
 Run `./uninstall.sh`, and it will remove the program and clean everything up.
-

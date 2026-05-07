@@ -5,7 +5,7 @@ mod utils;
 use clap::{CommandFactory, Parser};
 use device_manager::{format_usb_device_line, list_usb_devices};
 use log::error;
-use utils::handle_launch_agent;
+use utils::{handle_launch_agent, print_launch_agent_status};
 
 /// A KVM switch for BetterDisplay
 #[derive(Parser, Debug)]
@@ -18,8 +18,8 @@ A daemon that monitors USB device connections and automatically switches
 BetterDisplay input sources based on configured USB device events.
 
 This tool requires the --launch flag to run as a long-lived daemon that
-monitors USB devices. Use --install to set up the launch agent. Use --list
-to print connected USB devices.")]
+monitors USB devices. Use --install to set up the launch agent, --status
+to check whether it is running, or --list to print connected USB devices.")]
 struct Cli {
   /// Install the launch agent for automatic startup
   #[arg(
@@ -35,6 +35,14 @@ struct Cli {
     help = "List connected USB devices to stdout and exit"
   )]
   list: bool,
+
+  /// Print whether the macOS launch agent process is running
+  #[arg(
+    long,
+    conflicts_with_all = ["install", "launch", "list"],
+    help = "Print whether the macOS launch agent process is running and exit"
+  )]
+  status: bool,
 
   /// Run as a long-lived daemon (required for normal operation)
   #[arg(
@@ -57,6 +65,11 @@ fn main() -> anyhow::Result<()> {
     for info in list_usb_devices()? {
       println!("{}", format_usb_device_line(&info));
     }
+    return Ok(());
+  }
+
+  if cli.status {
+    print_launch_agent_status()?;
     return Ok(());
   }
 
