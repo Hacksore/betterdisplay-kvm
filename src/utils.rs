@@ -1,9 +1,14 @@
+use comfy_table::{
+  Attribute, Cell, Color, ContentArrangement, Table, modifiers::UTF8_ROUND_CORNERS,
+  presets::UTF8_FULL,
+};
 use flexi_logger::{Cleanup, Criterion, Duplicate, FileSpec, Logger, Naming, WriteMode};
 use log::{debug, error, info};
 use lunchctl::{LaunchAgent, LaunchControllable};
 use serde::{Deserialize, Serialize};
 use std::{
   fs,
+  io::{self, IsTerminal},
   path::{Path, PathBuf},
   process::{self, Command, Output},
 };
@@ -197,26 +202,71 @@ pub fn get_launch_agent_status() -> anyhow::Result<LaunchAgentStatus> {
 }
 
 pub fn print_launch_agent_status() -> anyhow::Result<()> {
-  match get_launch_agent_status()? {
-    LaunchAgentStatus::Running { pid } => {
-      if let Some(pid) = pid {
-        println!("{} is running (pid {}).", LAUNCH_AGENT_LABEL, pid);
-      } else {
-        println!("{} is running.", LAUNCH_AGENT_LABEL);
-      }
-    }
-    LaunchAgentStatus::LoadedNotRunning => {
-      println!(
-        "{} is loaded, but the process is not running.",
-        LAUNCH_AGENT_LABEL
-      );
-    }
-    LaunchAgentStatus::NotLoaded => {
-      println!("{} is not loaded or not running.", LAUNCH_AGENT_LABEL);
-    }
-  }
+  let status = get_launch_agent_status()?;
+  println!(
+    "{}",
+    format_launch_agent_status(&status, io::stdout().is_terminal())
+  );
 
   Ok(())
+}
+
+fn format_launch_agent_status(status: &LaunchAgentStatus, use_color: bool) -> String {
+  let (state, indicator, pid, detail, status_color) = match status {
+    LaunchAgentStatus::Running { pid } => (
+      "Running",
+      "OK",
+      pid.as_deref().unwrap_or("-"),
+      "LaunchAgent is loaded and the daemon is running.",
+      Color::Green,
+    ),
+    LaunchAgentStatus::LoadedNotRunning => (
+      "Loaded",
+      "WARN",
+      "-",
+      "LaunchAgent is loaded, but the daemon is not running.",
+      Color::Yellow,
+    ),
+    LaunchAgentStatus::NotLoaded => (
+      "Not loaded",
+      "OFF",
+      "-",
+      "LaunchAgent is not loaded or not running.",
+      Color::Red,
+    ),
+  };
+
+  let mut table = Table::new();
+  if use_color {
+    table.enforce_styling();
+  }
+
+  table
+    .load_preset(UTF8_FULL)
+    .apply_modifier(UTF8_ROUND_CORNERS)
+    .set_content_arrangement(ContentArrangement::Dynamic)
+    .set_header(vec![
+      Cell::new("betterdisplay-kvm status").add_attribute(Attribute::Bold),
+      Cell::new("Value").add_attribute(Attribute::Bold),
+    ])
+    .add_row(vec![Cell::new("Service"), Cell::new(LAUNCH_AGENT_LABEL)])
+    .add_row(vec![
+      Cell::new("Indicator"),
+      status_cell(indicator, status_color, use_color),
+    ])
+    .add_row(vec![
+      Cell::new("Status"),
+      status_cell(state, status_color, use_color),
+    ])
+    .add_row(vec![Cell::new("PID"), Cell::new(pid)])
+    .add_row(vec![Cell::new("Detail"), Cell::new(detail)]);
+
+  table.to_string()
+}
+
+fn status_cell(value: &str, color: Color, use_color: bool) -> Cell {
+  let cell = Cell::new(value).add_attribute(Attribute::Bold);
+  if use_color { cell.fg(color) } else { cell }
 }
 
 fn get_current_user_id() -> anyhow::Result<String> {
