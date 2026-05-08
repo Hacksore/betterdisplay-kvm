@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# TODO: do we need this or is it just for dev?
+
 set -euo pipefail
 
 # Simple installer for betterdisplay-kvm on macOS.
@@ -36,7 +38,8 @@ if [[ ! -e "${USR_LOCAL_BIN}" ]]; then
   sudo ln -s "${INSTALL_BIN}" "${USR_LOCAL_BIN}"
 fi
 
-# run the thing with a --install flag that will exit after it configures the launch
-./target/release/betterdisplay-kvm --install
+# Run the installed binary with --install so the LaunchAgent points at the
+# installed path, not the repo's target directory.
+"${INSTALL_BIN}" --install
 
 echo "done"

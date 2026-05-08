@@ -167,10 +167,11 @@ pub fn load_config() -> anyhow::Result<ResolvedConfig> {
 pub fn handle_launch_agent() -> anyhow::Result<()> {
   info!("Installing launch agent since --install was passed...");
   let mut agent = LaunchAgent::new(LAUNCH_AGENT_LABEL);
+  let executable_path = std::env::current_exe()
+    .map_err(|e| anyhow::anyhow!("Failed to resolve current executable path: {}", e))?;
 
-  // NOTE: the install.sh should move/link the bin here
   agent.program_arguments = vec![
-    "/usr/local/bin/betterdisplay-kvm".to_string(),
+    executable_path.to_string_lossy().to_string(),
     String::from("--launch"),
   ];
   agent.run_at_load = true;

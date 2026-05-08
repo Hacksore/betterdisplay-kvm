@@ -68,7 +68,35 @@ RUST_LOG=debug cargo watch -x "run -- --launch"
 
 ## Install
 
-Run `./install.sh`, and it will install a LaunchAgent and start the program.
+From crates.io:
+
+```bash
+cargo install betterdisplay-kvm
+betterdisplay-kvm --install
+```
+
+For local development, run `./install.sh`. It builds the release binary, installs
+it under `/usr/local/libexec/betterdisplay-kvm`, and starts the LaunchAgent.
+
+The LaunchAgent stores the path of the binary used for `--install`. If you
+install from Cargo, that is usually `~/.cargo/bin/betterdisplay-kvm`.
+
+## Upgrade
+
+After publishing a new version to crates.io, users can upgrade with:
+
+```bash
+cargo install --force betterdisplay-kvm
+launchctl kickstart -k "gui/$(id -u)/com.github.hacksore.betterdisplay-kvm"
+```
+
+`cargo install --force` replaces the installed binary in place. The `kickstart`
+command restarts the LaunchAgent so the running daemon switches to the new
+version immediately.
+
+If you previously installed with `./install.sh` and want future upgrades to come
+from Cargo, run `betterdisplay-kvm --install` once after `cargo install --force`.
+That rewrites the LaunchAgent to use Cargo's installed binary path.
 
 ## LaunchAgent status
 
