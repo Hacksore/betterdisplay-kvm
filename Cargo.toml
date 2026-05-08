@@ -2,25 +2,25 @@
 name = "betterdisplay-kvm"
 description = "A KVM switch for BetterDisplay"
 license = "MIT"
-version = "0.0.1"
+version = "0.0.2"
 edition = "2024"
 readme = "README.md"
 repository = "https://github.com/Hacksore/betterdisplay-kvm"
 
 [dependencies]
-anyhow = "1.0.99"
-clap = { version = "4.4", features = ["derive"] }
+anyhow = "1.0.102"
+clap = { version = "4.6.1", features = ["derive"] }
 comfy-table = "7"
-env_logger = "0.11.8"
+env_logger = "0.11.10"
 futures-lite = "2.0"
-log = "0.4.27"
-nusb = "0.2.0"
-config = { version = "0.14", default-features = false, features = ["toml"] }
-serde = { version = "1.0", features = ["derive"] }
-dirs = "5"
-toml = "0.9.5"
-lunchctl = "0.1.0"
-flexi_logger = "0.31"
+log = "0.4.29"
+nusb = "0.2.3"
+config = { version = "0.15.22", default-features = false, features = ["toml"] }
+serde = { version = "1.0.228", features = ["derive"] }
+dirs = "6"
+toml = "1.1.2"
+lunchctl = "0.2.2"
+flexi_logger = "0.31.8"
 
 [[bin]]
 name = "betterdisplay-kvm"
