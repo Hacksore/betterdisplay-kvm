@@ -76,10 +76,13 @@ betterdisplay-kvm --install
 ```
 
 For local development, run `./install.sh`. It builds the release binary, installs
-it under `/usr/local/libexec/betterdisplay-kvm`, and starts the LaunchAgent.
+it under `~/Library/Application Support/betterdisplay-kvm`, and starts the
+LaunchAgent.
 
-The LaunchAgent stores the path of the binary used for `--install`. If you
-install from Cargo, that is usually `~/.cargo/bin/betterdisplay-kvm`.
+The `--install` command copies the running binary into
+`~/Library/Application Support/betterdisplay-kvm/betterdisplay-kvm`, writes the
+LaunchAgent plist, and refreshes launchd so the loaded job uses the newly
+installed binary.
 
 ## Upgrade
 
@@ -96,7 +99,8 @@ version immediately.
 
 If you previously installed with `./install.sh` and want future upgrades to come
 from Cargo, run `betterdisplay-kvm --install` once after `cargo install --force`.
-That rewrites the LaunchAgent to use Cargo's installed binary path.
+That copies Cargo's installed binary into the stable per-user install location
+and restarts the LaunchAgent.
 
 ## LaunchAgent status
 

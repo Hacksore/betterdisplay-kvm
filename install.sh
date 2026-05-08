@@ -4,17 +4,13 @@
 
 set -euo pipefail
 
-# Simple installer for betterdisplay-kvm on macOS.
-# - Copies the release binary to /usr/local/libexec/betterdisplay-kvm/betterdisplay-kvm
-# - Adds a convenience symlink at /usr/local/bin/betterdisplay-kvm
-# - Installs LaunchAgent plist to ~/Library/LaunchAgents
-# - (Re)loads the LaunchAgent via launchctl
+# Simple development installer for betterdisplay-kvm on macOS.
+# - Builds the release binary
+# - Runs --install, which copies the binary to the user's Application Support
+#   directory and refreshes the LaunchAgent
 
 BIN_NAME="betterdisplay-kvm"
 BUILD_BIN="target/release/${BIN_NAME}"
-LIBEXEC_DIR="/usr/local/libexec/${BIN_NAME}"
-INSTALL_BIN="${LIBEXEC_DIR}/${BIN_NAME}"
-USR_LOCAL_BIN="/usr/local/bin/${BIN_NAME}"
 
 # building in release mode is recommended
 cargo build --release
@@ -26,20 +22,6 @@ if [[ ! -f "${BUILD_BIN}" ]]; then
   exit 1
 fi
 
-echo "==> Creating libexec dir: ${LIBEXEC_DIR}"
-sudo mkdir -p "${LIBEXEC_DIR}"
-
-echo "==> Copying binary to ${INSTALL_BIN}"
-sudo cp "${BUILD_BIN}" "${INSTALL_BIN}"
-sudo chmod 777 "${INSTALL_BIN}"
-
-echo "==> Creating symlink ${USR_LOCAL_BIN} -> ${INSTALL_BIN} (if missing)"
-if [[ ! -e "${USR_LOCAL_BIN}" ]]; then
-  sudo ln -s "${INSTALL_BIN}" "${USR_LOCAL_BIN}"
-fi
-
-# Run the installed binary with --install so the LaunchAgent points at the
-# installed path, not the repo's target directory.
-"${INSTALL_BIN}" --install
+"${BUILD_BIN}" --install
 
 echo "done"

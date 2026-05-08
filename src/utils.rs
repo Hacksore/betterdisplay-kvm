@@ -4,17 +4,19 @@ use comfy_table::{
 };
 use flexi_logger::{Cleanup, Criterion, Duplicate, FileSpec, Logger, Naming, WriteMode};
 use log::{debug, error, info};
-use lunchctl::{LaunchAgent, LaunchControllable};
+use lunchctl::LaunchAgent;
 use serde::{Deserialize, Serialize};
 use std::{
   fs,
   io::{self, IsTerminal},
+  os::unix::fs::PermissionsExt,
   path::{Path, PathBuf},
   process::{self, Command, Output},
 };
 
 pub const DEFAULT_DEVICE_ID: &str = "046d:c547";
 pub const LAUNCH_AGENT_LABEL: &str = "com.github.hacksore.betterdisplay-kvm";
+const BIN_NAME: &str = "betterdisplay-kvm";
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AppConfig {
@@ -167,8 +169,7 @@ pub fn load_config() -> anyhow::Result<ResolvedConfig> {
 pub fn handle_launch_agent() -> anyhow::Result<()> {
   info!("Installing launch agent since --install was passed...");
   let mut agent = LaunchAgent::new(LAUNCH_AGENT_LABEL);
-  let executable_path = std::env::current_exe()
-    .map_err(|e| anyhow::anyhow!("Failed to resolve current executable path: {}", e))?;
+  let executable_path = install_current_executable()?;
 
   agent.program_arguments = vec![
     executable_path.to_string_lossy().to_string(),
@@ -178,11 +179,84 @@ pub fn handle_launch_agent() -> anyhow::Result<()> {
   agent.keep_alive = true;
 
   agent.write()?;
-  agent.bootstrap()?;
+  refresh_launch_agent(&agent)?;
 
   info!("Launch agent installed and started.");
 
   process::exit(0);
+}
+
+fn install_current_executable() -> anyhow::Result<PathBuf> {
+  let current_exe = std::env::current_exe()
+    .map_err(|e| anyhow::anyhow!("Failed to resolve current executable path: {}", e))?;
+  let install_path = installed_executable_path()?;
+
+  if paths_point_to_same_file(&current_exe, &install_path) {
+    return Ok(install_path);
+  }
+
+  if let Some(parent) = install_path.parent() {
+    fs::create_dir_all(parent)?;
+  }
+
+  fs::copy(&current_exe, &install_path).map_err(|e| {
+    anyhow::anyhow!(
+      "Failed to install executable from {} to {}: {}",
+      current_exe.display(),
+      install_path.display(),
+      e
+    )
+  })?;
+  fs::set_permissions(&install_path, fs::Permissions::from_mode(0o755))?;
+
+  Ok(install_path)
+}
+
+fn installed_executable_path() -> anyhow::Result<PathBuf> {
+  let mut path = dirs::home_dir().ok_or_else(|| anyhow::anyhow!("Failed to get home directory"))?;
+  path.push("Library");
+  path.push("Application Support");
+  path.push(BIN_NAME);
+  path.push(BIN_NAME);
+  Ok(path)
+}
+
+fn paths_point_to_same_file(left: &Path, right: &Path) -> bool {
+  match (left.canonicalize(), right.canonicalize()) {
+    (Ok(left), Ok(right)) => left == right,
+    _ => false,
+  }
+}
+
+fn refresh_launch_agent(agent: &LaunchAgent) -> anyhow::Result<()> {
+  let user_id = get_current_user_id()?;
+  let target = format!("gui/{}/{}", user_id, LAUNCH_AGENT_LABEL);
+  let domain = format!("gui/{}", user_id);
+  let plist_path = agent.path();
+
+  let _ = Command::new("launchctl")
+    .args(["bootout", &target])
+    .output();
+
+  run_launchctl(["bootstrap", &domain, &plist_path.to_string_lossy()])?;
+  run_launchctl(["enable", &target])?;
+  run_launchctl(["kickstart", "-k", &target])?;
+
+  Ok(())
+}
+
+fn run_launchctl<const N: usize>(args: [&str; N]) -> anyhow::Result<()> {
+  let output = Command::new("launchctl").args(args).output()?;
+  if !output.status.success() {
+    return Err(anyhow::anyhow!(
+      "launchctl failed with status {}: {}{}",
+      output.status,
+      String::from_utf8_lossy(&output.stdout),
+      String::from_utf8_lossy(&output.stderr)
+    ));
+  }
+
+  Ok(())
 }
 
 #[derive(Debug, PartialEq, Eq)]
