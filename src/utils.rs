@@ -11,7 +11,8 @@ use std::{
   io::{self, IsTerminal},
   os::unix::fs::PermissionsExt,
   path::{Path, PathBuf},
-  process::{self, Command, Output},
+  process::Command,
+  process::{self, Output},
 };
 
 pub const DEFAULT_DEVICE_ID: &str = "046d:c547";
@@ -55,44 +56,45 @@ pub struct ResolvedConfig {
   pub ddc_alt: bool,
 }
 
-pub fn get_betterdisplay_path() -> PathBuf {
-  if let Ok(override_path) = std::env::var("BETTERDISPLAYCLI_PATH") {
-    let p = PathBuf::from(override_path);
-    if p.exists() {
-      return p;
+fn resolve_betterdisplay_path(
+  override_path: Option<PathBuf>,
+  candidates: &[PathBuf],
+) -> anyhow::Result<PathBuf> {
+  if let Some(path) = override_path {
+    if path.is_file() {
+      return Ok(path);
+    }
+    return Err(anyhow::anyhow!(
+      "BETTERDISPLAYCLI_PATH is set but does not point to a file: {}",
+      path.display()
+    ));
+  }
+
+  for candidate in candidates {
+    if candidate.is_file() {
+      return Ok(candidate.clone());
     }
   }
 
-  let common_candidates = [
-    "/opt/homebrew/bin/betterdisplaycli",
-    "/usr/local/bin/betterdisplaycli",
-    "/usr/bin/betterdisplaycli",
-    "/bin/betterdisplaycli",
-  ];
-  for candidate in common_candidates {
-    let p = Path::new(candidate);
-    if p.exists() {
-      return p.to_path_buf();
-    }
-  }
-
-  if let Some(path_var) = std::env::var_os("PATH") {
-    for dir in std::env::split_paths(&path_var) {
-      let p = dir.join("betterdisplaycli");
-      if p.exists() {
-        return p;
-      }
-    }
-  }
-
-  error!(
+  Err(anyhow::anyhow!(
     "Could not locate 'betterdisplaycli'. Set BETTERDISPLAYCLI_PATH or install to /opt/homebrew/bin or /usr/local/bin."
-  );
-  process::exit(1);
+  ))
+}
+
+pub fn get_betterdisplay_path() -> anyhow::Result<PathBuf> {
+  let override_path = std::env::var_os("BETTERDISPLAYCLI_PATH").map(PathBuf::from);
+  let common_candidates = [
+    Path::new("/opt/homebrew/bin/betterdisplaycli").to_path_buf(),
+    Path::new("/usr/local/bin/betterdisplaycli").to_path_buf(),
+    Path::new("/usr/bin/betterdisplaycli").to_path_buf(),
+    Path::new("/bin/betterdisplaycli").to_path_buf(),
+  ];
+
+  resolve_betterdisplay_path(override_path, &common_candidates)
 }
 
 pub fn set_input(input_code: u16, use_ddc_alt: bool) -> anyhow::Result<()> {
-  let betterdisplay_path = get_betterdisplay_path();
+  let betterdisplay_path = get_betterdisplay_path()?;
 
   // TODO: figure out how to make this path dynamic or configurable
   let mut cmd = Command::new(betterdisplay_path);
@@ -124,6 +126,79 @@ pub fn set_input(input_code: u16, use_ddc_alt: bool) -> anyhow::Result<()> {
 
   debug!("Successfully executed betterdisplaycli command");
   Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+  use super::resolve_betterdisplay_path;
+  use std::{
+    fs,
+    path::PathBuf,
+    time::{SystemTime, UNIX_EPOCH},
+  };
+
+  fn unique_temp_dir() -> PathBuf {
+    let nanos = SystemTime::now()
+      .duration_since(UNIX_EPOCH)
+      .unwrap()
+      .as_nanos();
+    std::env::temp_dir().join(format!(
+      "betterdisplay-kvm-test-{}-{}",
+      std::process::id(),
+      nanos
+    ))
+  }
+
+  #[test]
+  fn resolve_path_prefers_valid_override() {
+    let dir = unique_temp_dir();
+    fs::create_dir_all(&dir).unwrap();
+    let override_path = dir.join("override-betterdisplaycli");
+    let candidate_path = dir.join("candidate-betterdisplaycli");
+    fs::write(&override_path, "").unwrap();
+    fs::write(&candidate_path, "").unwrap();
+
+    let resolved = resolve_betterdisplay_path(
+      Some(override_path.clone()),
+      std::slice::from_ref(&candidate_path),
+    )
+    .unwrap();
+    assert_eq!(resolved, override_path);
+
+    fs::remove_dir_all(&dir).unwrap();
+  }
+
+  #[test]
+  fn resolve_path_errors_for_invalid_override() {
+    let dir = unique_temp_dir();
+    fs::create_dir_all(&dir).unwrap();
+    let missing_override = dir.join("missing-betterdisplaycli");
+    let candidate_path = dir.join("candidate-betterdisplaycli");
+    fs::write(&candidate_path, "").unwrap();
+
+    let err = resolve_betterdisplay_path(
+      Some(missing_override),
+      std::slice::from_ref(&candidate_path),
+    )
+    .unwrap_err();
+    assert!(err.to_string().contains("BETTERDISPLAYCLI_PATH"));
+
+    fs::remove_dir_all(&dir).unwrap();
+  }
+
+  #[test]
+  fn resolve_path_uses_first_existing_candidate() {
+    let dir = unique_temp_dir();
+    fs::create_dir_all(&dir).unwrap();
+    let missing = dir.join("missing-betterdisplaycli");
+    let existing = dir.join("existing-betterdisplaycli");
+    fs::write(&existing, "").unwrap();
+
+    let resolved = resolve_betterdisplay_path(None, &[missing, existing.clone()]).unwrap();
+    assert_eq!(resolved, existing);
+
+    fs::remove_dir_all(&dir).unwrap();
+  }
 }
 
 pub fn on_connect(cfg: &ResolvedConfig) {

@@ -1,4 +1,4 @@
-use crate::utils::{ResolvedConfig, get_betterdisplay_path, load_config, setup_logger};
+use crate::utils::{ResolvedConfig, load_config, setup_logger};
 use log::{debug, error, info};
 use std::panic;
 
@@ -19,9 +19,6 @@ impl App {
     setup_logger(&config)?;
 
     info!("betterdisplay-kvm starting...");
-
-    let betterdisplay_path = get_betterdisplay_path();
-    debug!("Found betterdisplaycli at: {:?}", betterdisplay_path);
 
     // Set up panic hook to capture panics and log them
     Self::setup_panic_hook();
