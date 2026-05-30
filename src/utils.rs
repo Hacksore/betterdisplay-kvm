@@ -13,11 +13,13 @@ use std::{
   path::{Path, PathBuf},
   process::Command,
   process::{self, Output},
+  sync::OnceLock,
 };
 
 pub const DEFAULT_DEVICE_ID: &str = "046d:c547";
 pub const LAUNCH_AGENT_LABEL: &str = "com.github.hacksore.betterdisplay-kvm";
 const BIN_NAME: &str = "betterdisplay-kvm";
+static BETTERDISPLAY_PATH_CACHE: OnceLock<Result<PathBuf, String>> = OnceLock::new();
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AppConfig {
@@ -81,7 +83,7 @@ fn resolve_betterdisplay_path(
   ))
 }
 
-pub fn get_betterdisplay_path() -> anyhow::Result<PathBuf> {
+fn detect_betterdisplay_path() -> anyhow::Result<PathBuf> {
   let override_path = std::env::var_os("BETTERDISPLAYCLI_PATH").map(PathBuf::from);
   let common_candidates = [
     Path::new("/opt/homebrew/bin/betterdisplaycli").to_path_buf(),
@@ -91,6 +93,21 @@ pub fn get_betterdisplay_path() -> anyhow::Result<PathBuf> {
   ];
 
   resolve_betterdisplay_path(override_path, &common_candidates)
+}
+
+pub fn get_betterdisplay_path() -> anyhow::Result<PathBuf> {
+  match BETTERDISPLAY_PATH_CACHE
+    .get_or_init(|| detect_betterdisplay_path().map_err(|err| err.to_string()))
+  {
+    Ok(path) => Ok(path.clone()),
+    Err(err) => Err(anyhow::anyhow!("{}", err)),
+  }
+}
+
+pub fn prime_betterdisplay_path_cache() {
+  if let Err(err) = get_betterdisplay_path() {
+    debug!("betterdisplaycli path preflight failed: {}", err);
+  }
 }
 
 pub fn set_input(input_code: u16, use_ddc_alt: bool) -> anyhow::Result<()> {

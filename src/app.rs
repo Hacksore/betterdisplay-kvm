@@ -1,4 +1,4 @@
-use crate::utils::{ResolvedConfig, load_config, setup_logger};
+use crate::utils::{ResolvedConfig, load_config, prime_betterdisplay_path_cache, setup_logger};
 use log::{debug, error, info};
 use std::panic;
 
@@ -24,6 +24,7 @@ impl App {
     Self::setup_panic_hook();
 
     debug!("Starting betterdisplay-kvm with config: {:?}", config);
+    prime_betterdisplay_path_cache();
 
     Ok(Self { config })
   }
