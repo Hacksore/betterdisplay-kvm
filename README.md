@@ -124,6 +124,22 @@ Restart the agent after changing config:
 launchctl kickstart -k "gui/$(id -u)/com.github.hacksore.betterdisplay-kvm"
 ```
 
+Stop the LaunchAgent when you want to run the daemon manually:
+
+```bash
+launchctl bootout "gui/$(id -u)/com.github.hacksore.betterdisplay-kvm"
+betterdisplay-kvm --status
+cargo run -- --launch
+```
+
+Start the LaunchAgent again when you are done:
+
+```bash
+launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/com.github.hacksore.betterdisplay-kvm.plist"
+launchctl enable "gui/$(id -u)/com.github.hacksore.betterdisplay-kvm"
+launchctl kickstart -k "gui/$(id -u)/com.github.hacksore.betterdisplay-kvm"
+```
+
 The generated plist lives at:
 
 ```text
