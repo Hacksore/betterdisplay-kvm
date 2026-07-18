@@ -11,7 +11,6 @@ repository = "https://github.com/Hacksore/betterdisplay-kvm"
 anyhow = "1.0.102"
 clap = { version = "4.6.1", features = ["derive"] }
 comfy-table = "7"
-env_logger = "0.11.10"
 futures-lite = "2.0"
 log = "0.4.29"
 nusb = "0.2.3"

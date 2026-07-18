@@ -19,12 +19,15 @@ impl App {
     setup_logger(&config)?;
 
     info!("betterdisplay-kvm starting...");
+    debug!("Configuration loaded: {:?}", config);
 
     // Set up panic hook to capture panics and log them
+    debug!("Installing panic hook");
     Self::setup_panic_hook();
 
-    debug!("Starting betterdisplay-kvm with config: {:?}", config);
+    debug!("Preflighting betterdisplaycli path");
     prime_betterdisplay_path_cache();
+    debug!("Application initialization complete");
 
     Ok(Self { config })
   }
