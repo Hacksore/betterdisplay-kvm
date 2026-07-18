@@ -127,7 +127,7 @@ launchctl kickstart -k "gui/$(id -u)/com.github.hacksore.betterdisplay-kvm"
 Stop the LaunchAgent when you want to run the daemon manually:
 
 ```bash
-launchctl bootout "gui/$(id -u)/com.github.hacksore.betterdisplay-kvm"
+betterdisplay-kvm --stop
 betterdisplay-kvm --status
 cargo run -- --launch
 ```

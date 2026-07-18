@@ -305,6 +305,31 @@ pub fn print_launch_agent_status() -> anyhow::Result<()> {
   Ok(())
 }
 
+pub fn stop_launch_agent() -> anyhow::Result<()> {
+  let user_id = get_current_user_id()?;
+  let target = format!("gui/{}/{}", user_id, LAUNCH_AGENT_LABEL);
+  let output = Command::new("launchctl")
+    .args(["bootout", &target])
+    .output()?;
+
+  if output.status.success() {
+    println!("Launch agent stopped.");
+    return Ok(());
+  }
+
+  if get_launch_agent_status()? == LaunchAgentStatus::NotLoaded {
+    println!("Launch agent is already stopped.");
+    return Ok(());
+  }
+
+  Err(anyhow::anyhow!(
+    "Failed to stop launch agent (status {}): {}{}",
+    output.status,
+    String::from_utf8_lossy(&output.stdout),
+    String::from_utf8_lossy(&output.stderr)
+  ))
+}
+
 fn format_launch_agent_status(status: &LaunchAgentStatus, use_color: bool) -> String {
   let (state, indicator, pid, detail, status_color) = match status {
     LaunchAgentStatus::Running { pid } => (
